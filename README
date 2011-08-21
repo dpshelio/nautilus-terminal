@@ -1,0 +1,13 @@
+==============================================================================
+=    Nautilus Terminal - A terminal embedded in the Nautilus file browser    =
+==============================================================================
+
+Dependencies:
+-------------
+
+	* Python (>= 2.6, < 3.0) <http://python.org/>
+	* Nautilus (>= 3.0) <http://live.gnome.org/Nautilus>
+	* Nautilus Python (>= 1.0) <http://projects.gnome.org/nautilus-python/>
+	* PyGObject <http://live.gnome.org/PyGObject>
+	* VTE <http://live.gnome.org/VTE>
+
