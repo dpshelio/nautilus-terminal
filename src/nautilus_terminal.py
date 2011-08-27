@@ -45,6 +45,7 @@ CONF = {
     'shell': Vte.get_user_shell(),
     'def_term_height': 5, #lines
     'def_visible': True,
+    'term_on_top': True,
     }
 
 
@@ -65,16 +66,10 @@ class NautilusTerminal(object):
                 GLib.SpawnFlags.SEARCH_PATH, None, self.shell_pid)[1]
         #Swin
         self.swin = Gtk.ScrolledWindow()
+        self.swin.nt = self
         #Conf
         self._set_term_height(CONF['def_term_height'])
         self._visible = True
-
-    def has_parent(self):
-        """Check if Nautilus Terminal has a parent gtk container"""
-        if self.swin.get_parent():
-            return True
-        else:
-            return False
 
     def change_directory(self, uri):
         """Change the current directory in the shell if it is not busy.
@@ -133,6 +128,82 @@ class NautilusTerminal(object):
                 height * self.term.get_char_height() + 2)
 
 
+class Crowbar(object):
+    """Modify the Nautilus' widget tree when the crowbar is inserted in it.
+
+    Args:
+        uri -- The URI of the current directory.
+    """
+
+    def __init__(self, uri):
+        """The constructor."""
+        self._uri = uri
+        #Crowbar
+        self._crowbar = Gtk.EventBox()
+        self._crowbar.connect_after("parent-set", self._on_parent_set)
+        #Lock
+        self._lock = False
+
+    def get_widget(self):
+        """Returns the crowbar."""
+        return self._crowbar
+
+    def _on_parent_set(self, widget, old_parent):
+        """Called when the crowbar is inserted in the Nautilus' widget tree.
+
+        Args:
+            widget -- The crowbar (self._crowbar)
+            old_parent -- The previous parent of the crowbar (None...)
+        """
+        #Check if the work has already started
+        if self._lock:
+            return
+        else:
+            self._lock = True
+        #Get the parents of the crowbar
+        crowbar_p = self._crowbar.get_parent()
+        crowbar_pp = crowbar_p.get_parent()
+        crowbar_ppp = crowbar_pp.get_parent()
+        #Get the childen of crowbar_pp
+        crowbar_pp_children = crowbar_pp.get_children()
+        #Check if our vpan is already there
+        if type(crowbar_ppp) == Gtk.VPaned:
+            #Find the Nautilus Terminal
+            nterm = None
+            for crowbar_ppp_child in crowbar_ppp.get_children():
+                if type(crowbar_ppp_child) == Gtk.ScrolledWindow:
+                    if hasattr(crowbar_ppp_child, "nt"):
+                        nterm = crowbar_ppp_child.nt
+                    break
+            #Update the temrinal (cd,...)
+            if nterm:
+                nterm.change_directory(self._uri)
+        #New tab/window/split
+        else:
+            #Create the vpan
+            vpan = Gtk.VPaned()
+            vpan.show()
+            vbox = Gtk.VBox()
+            vbox.show()
+            if CONF['term_on_top']:
+                vpan.add2(vbox)
+            else:
+                vpan.add1(vbox)
+            #Add the vpan in Nautilus, and reparent some widgets
+            if len(crowbar_pp_children) == 2:
+                for crowbar_pp_child in crowbar_pp_children:
+                    crowbar_pp.remove(crowbar_pp_child)
+                crowbar_pp.pack_start(vpan, True, True, 0)
+                vbox.pack_start(crowbar_pp_children[0], False, False, 0)
+                vbox.pack_start(crowbar_pp_children[1], True, True, 0)
+            #Create the terminal
+            nt = NautilusTerminal(self._uri)
+            if CONF['term_on_top']:
+                vpan.add1(nt.get_widget())
+            else:
+                vpan.add2(nt.get_widget())
+
+
 class NautilusTerminalProvider(GObject, Nautilus.LocationWidgetProvider):
     """Provides Nautilus Terminal in Nautilus."""
 
@@ -141,37 +212,19 @@ class NautilusTerminalProvider(GObject, Nautilus.LocationWidgetProvider):
         print("Initializing nautilus-terminal extension")
 
     def get_widget(self, uri, window):
-        """Return the top-level widget of a Nautilus Terminal.
+        """Returns a "crowbar" that will add a terminal in Nautilus.
 
         Args:
             uri -- The URI of the current directory.
             window -- The Nautilus' window.
         """
-        #Init
-        if not hasattr(window, "terms"):
-            window.terms = []
-        if not hasattr(window, "visible"):
-            window.visible = CONF['def_visible']
         #URI specific stuff
         if uri.startswith("x-nautilus-desktop:///"):
             return
         elif not uri.startswith("file:///"):
             uri = "file://%s" % os.environ["HOME"]
-        #Try to re-use an existing terminal
-        nt = None
-        for item in window.terms:
-            if not item.has_parent():
-                nt = item
-                break #FIXME: remove unused terms
-        #New terminal
-        if not nt:
-            nt = NautilusTerminal(uri)
-            nt.set_visible(window.visible)
-            window.terms.append(nt)
-        else:
-            nt.change_directory(uri)
-        window.connect_after("key-release-event", self._toggle_visible)
-        return nt.get_widget()
+        #Return the crowbar
+        return Crowbar(uri).get_widget()
 
     def _toggle_visible(self, window, event):
         """Toggle the visibility of Nautilus Terminal.
@@ -184,14 +237,12 @@ class NautilusTerminalProvider(GObject, Nautilus.LocationWidgetProvider):
             event -- The detail of the event.
         """
         if event.keyval == 65473: #F4
-            window.visible = not window.visible
-            for nt in window.terms:
-                nt.set_visible(window.visible)
+            #TODO
             return True #Stop the event propagation
 
 
 if __name__ == "__main__":
-    #Code for testing nautilus terminal outside of Nautilus
+    #Code for testing Nautilus Terminal outside of Nautilus
     print("%s %s\nBy %s" % (__app_disp_name__, __version__, __author__))
     nterm = NautilusTerminal("file://%s" % os.environ["HOME"])
     nterm.get_widget().set_size_request(nterm.term.get_char_width() * 80 + 2,
