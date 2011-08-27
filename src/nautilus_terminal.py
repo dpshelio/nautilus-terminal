@@ -54,10 +54,12 @@ class NautilusTerminal(object):
 
     Args:
         uri -- The URI of the folder where the terminal will be created.
+        window -- The parent window.
     """
 
-    def __init__(self, uri):
+    def __init__(self, uri, window):
         """The constructor."""
+        self._window = window
         #Term
         self.shell_pid = -1
         self.term = Vte.Terminal()
@@ -70,6 +72,9 @@ class NautilusTerminal(object):
         #Conf
         self._set_term_height(CONF['def_term_height'])
         self._visible = True
+        #Register the callback for show/hide
+        if hasattr(window, "toggle_hide_cb"):
+            window.toggle_hide_cb.append(self.set_visible)
 
     def change_directory(self, uri):
         """Change the current directory in the shell if it is not busy.
@@ -91,7 +96,7 @@ class NautilusTerminal(object):
         return self.swin
 
     def set_visible(self, visible):
-        """Change the visibility of Nautilus Terminal
+        """Change the visibility of Nautilus Terminal.
 
         Args:
             visible -- True for showing Nautilus Terminal, False for hiding.
@@ -99,6 +104,7 @@ class NautilusTerminal(object):
         self._visible = visible
         if visible:
             self.swin.show_all()
+            self._window.set_focus(self.term)
         else:
             self.swin.hide()
 
@@ -133,11 +139,13 @@ class Crowbar(object):
 
     Args:
         uri -- The URI of the current directory.
+        window -- The Nautilus' window.
     """
 
-    def __init__(self, uri):
+    def __init__(self, uri, window):
         """The constructor."""
         self._uri = uri
+        self._window = window
         #Crowbar
         self._crowbar = Gtk.EventBox()
         self._crowbar.connect_after("parent-set", self._on_parent_set)
@@ -152,8 +160,8 @@ class Crowbar(object):
         """Called when the crowbar is inserted in the Nautilus' widget tree.
 
         Args:
-            widget -- The crowbar (self._crowbar)
-            old_parent -- The previous parent of the crowbar (None...)
+            widget -- The crowbar (self._crowbar).
+            old_parent -- The previous parent of the crowbar (None...).
         """
         #Check if the work has already started
         if self._lock:
@@ -197,11 +205,13 @@ class Crowbar(object):
                 vbox.pack_start(crowbar_pp_children[0], False, False, 0)
                 vbox.pack_start(crowbar_pp_children[1], True, True, 0)
             #Create the terminal
-            nt = NautilusTerminal(self._uri)
+            nterm = NautilusTerminal(self._uri, self._window)
+            if hasattr(self._window, "term_visible"):
+                nterm.set_visible(self._window.term_visible)
             if CONF['term_on_top']:
-                vpan.add1(nt.get_widget())
+                vpan.add1(nterm.get_widget())
             else:
-                vpan.add2(nt.get_widget())
+                vpan.add2(nterm.get_widget())
 
 
 class NautilusTerminalProvider(GObject, Nautilus.LocationWidgetProvider):
@@ -218,13 +228,19 @@ class NautilusTerminalProvider(GObject, Nautilus.LocationWidgetProvider):
             uri -- The URI of the current directory.
             window -- The Nautilus' window.
         """
+        if not hasattr(window, "toggle_hide_cb"):
+            window.toggle_hide_cb = []
+        if not hasattr(window, "term_visible"):
+            window.term_visible = CONF['def_visible']
         #URI specific stuff
         if uri.startswith("x-nautilus-desktop:///"):
             return
         elif not uri.startswith("file:///"):
             uri = "file://%s" % os.environ["HOME"]
+        #Event
+        window.connect_after("key-release-event", self._toggle_visible)
         #Return the crowbar
-        return Crowbar(uri).get_widget()
+        return Crowbar(uri, window).get_widget()
 
     def _toggle_visible(self, window, event):
         """Toggle the visibility of Nautilus Terminal.
@@ -237,17 +253,19 @@ class NautilusTerminalProvider(GObject, Nautilus.LocationWidgetProvider):
             event -- The detail of the event.
         """
         if event.keyval == 65473: #F4
-            #TODO
+            window.term_visible = not window.term_visible
+            for callback in window.toggle_hide_cb:
+                callback(window.term_visible)
             return True #Stop the event propagation
 
 
 if __name__ == "__main__":
     #Code for testing Nautilus Terminal outside of Nautilus
     print("%s %s\nBy %s" % (__app_disp_name__, __version__, __author__))
-    nterm = NautilusTerminal("file://%s" % os.environ["HOME"])
+    win = Gtk.Window()
+    nterm = NautilusTerminal("file://%s" % os.environ["HOME"], win)
     nterm.get_widget().set_size_request(nterm.term.get_char_width() * 80 + 2,
             nterm.term.get_char_height() * 24 + 2)
-    win = Gtk.Window()
     win.connect_after("destroy", Gtk.main_quit)
     win.add(nterm.get_widget())
     win.show_all()
