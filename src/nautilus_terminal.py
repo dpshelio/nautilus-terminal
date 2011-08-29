@@ -36,6 +36,7 @@ __app_disp_name__ = "Nautilus Terminal"
 
 import os
 import urllib
+from signal import SIGTERM, SIGKILL
 
 from gobject import GObject
 from gi.repository import Nautilus, Gtk, Vte, GLib
@@ -60,18 +61,22 @@ class NautilusTerminal(object):
     def __init__(self, uri, window):
         """The constructor."""
         self._window = window
+        self._path = self._uri_to_path(uri)
         #Term
         self.shell_pid = -1
         self.term = Vte.Terminal()
         self.shell_pid = self.term.fork_command_full(Vte.PtyFlags.DEFAULT,
-                self._uri_to_path(uri), [CONF['shell']], None,
-                GLib.SpawnFlags.SEARCH_PATH, None, self.shell_pid)[1]
+                self._path, [CONF['shell']], None, GLib.SpawnFlags.SEARCH_PATH,
+                None, self.shell_pid)[1]
+        self.term.connect_after("child-exited", self._on_term_child_exited)
         #Swin
         self.swin = Gtk.ScrolledWindow()
         self.swin.nt = self
         #Conf
         self._set_term_height(CONF['def_term_height'])
         self._visible = True
+        #Lock
+        self._respawn_lock = False
         #Register the callback for show/hide
         if hasattr(window, "toggle_hide_cb"):
             window.toggle_hide_cb.append(self.set_visible)
@@ -82,8 +87,9 @@ class NautilusTerminal(object):
         Args:
             uri -- The URI of the destination directory.
         """
-        if uri[:7] == "file://" and not self._shell_is_busy():
-            cdcmd = " cd '%s'\n" % self._uri_to_path(uri).replace("'", r"'\''")
+        self._path = self._uri_to_path(uri)
+        if not self._shell_is_busy():
+            cdcmd = " cd '%s'\n" % self._path.replace("'", r"'\''")
             #self.term.feed("\033[8m", len("\033[8m"))
             self.term.feed_child(cdcmd, len(cdcmd))
 
@@ -107,6 +113,19 @@ class NautilusTerminal(object):
             self._window.set_focus(self.term)
         else:
             self.swin.hide()
+
+    def destroy(self):
+        """Release widgets and the shell process."""
+        #Terminate the shell
+        self._respawn_lock = True
+        os.kill(self.shell_pid, SIGTERM)
+        os.kill(self.shell_pid, SIGKILL)
+        #Remove some widgets
+        self.term.destroy()
+        self.swin.destroy()
+        #Remove callback
+        if hasattr(self._window, "toggle_hide_cb"):
+            self._window.toggle_hide_cb.remove(self.set_visible)
 
     def _shell_is_busy(self):
         """Check if the shell is waiting for a command or not."""
@@ -133,6 +152,17 @@ class NautilusTerminal(object):
         self.swin.set_size_request(-1,
                 height * self.term.get_char_height() + 2)
 
+    def _on_term_child_exited(self, term):
+        """Called when the shell is terminated.
+
+        Args:
+            term -- The VTE terminal (self.term).
+        """
+        if not self._respawn_lock:
+            self.shell_pid = self.term.fork_command_full(Vte.PtyFlags.DEFAULT,
+                self._path, [CONF['shell']], None, GLib.SpawnFlags.SEARCH_PATH,
+                None, self.shell_pid)[1]
+
 
 class Crowbar(object):
     """Modify the Nautilus' widget tree when the crowbar is inserted in it.
@@ -148,7 +178,7 @@ class Crowbar(object):
         self._window = window
         #Crowbar
         self._crowbar = Gtk.EventBox()
-        self._crowbar.connect_after("parent-set", self._on_parent_set)
+        self._crowbar.connect_after("parent-set", self._on_crowbar_parent_set)
         #Lock
         self._lock = False
 
@@ -156,7 +186,7 @@ class Crowbar(object):
         """Returns the crowbar."""
         return self._crowbar
 
-    def _on_parent_set(self, widget, old_parent):
+    def _on_crowbar_parent_set(self, widget, old_parent):
         """Called when the crowbar is inserted in the Nautilus' widget tree.
 
         Args:
@@ -172,6 +202,7 @@ class Crowbar(object):
         crowbar_p = self._crowbar.get_parent()
         crowbar_pp = crowbar_p.get_parent()
         crowbar_ppp = crowbar_pp.get_parent()
+        crowbar_pp.connect_after("parent-set", self._on_crowbar_pp_parent_set)
         #Get the childen of crowbar_pp
         crowbar_pp_children = crowbar_pp.get_children()
         #Check if our vpan is already there
@@ -213,13 +244,43 @@ class Crowbar(object):
             else:
                 vpan.add2(nterm.get_widget())
 
+    def _on_crowbar_pp_parent_set(self, widget, old_parent):
+        """Called when the vpan parent lost his parent.
+
+        Args:
+            widget -- The vpan's parent.
+            old_parent -- The previous parent.
+        """
+        if not widget.get_parent():
+            vpan = None
+            for child in widget.get_children():
+                if type(child) == Gtk.VPaned:
+                    vpan = child
+                    break
+            if not vpan:
+                print("[%s] W: Can't find the VPaned..." % __app_disp_name__)
+                return
+            swin = None
+            for child in vpan.get_children():
+                if type(child) == Gtk.ScrolledWindow:
+                    swin = child
+            if not swin:
+                print("[%s] W: Can't find the ScrolledWindow..."
+                        % __app_disp_name__)
+                return
+            if not hasattr(swin, "nt"):
+                print("[%s] W: Can't find the Nautilus Terminal instance..."
+                        % __app_disp_name__)
+            swin.nt.destroy()
+
 
 class NautilusTerminalProvider(GObject, Nautilus.LocationWidgetProvider):
     """Provides Nautilus Terminal in Nautilus."""
 
     def __init__(self):
         """The constructor."""
-        print("Initializing nautilus-terminal extension")
+        print("[%s] I: Initializing nautilus-terminal extension"
+                % __app_disp_name__)
 
     def get_widget(self, uri, window):
         """Returns a "crowbar" that will add a terminal in Nautilus.
