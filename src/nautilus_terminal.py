@@ -37,17 +37,59 @@ __app_disp_name__ = "Nautilus Terminal"
 import os
 import urllib
 from signal import SIGTERM, SIGKILL
+from ConfigParser import RawConfigParser
 
 from gobject import GObject
 from gi.repository import Nautilus, Gtk, Vte, GLib
 
 
-CONF = {
-    'shell': Vte.get_user_shell(),
-    'def_term_height': 5, #lines
-    'def_visible': True,
-    'term_on_top': True,
-    }
+class Config(object):
+    def __init__(self):
+        self._default = {
+            'general/def_term_height': 5, #lines
+            'general/def_visible': True,
+            'general/term_on_top': True,
+            'terminal/shell': Vte.get_user_shell(),
+            }
+        self._confp = RawConfigParser()
+        self.read()
+
+    def read(self):
+        """Read the configuration from a file."""
+        #Determine where is stored the configuration
+        config_file = os.path.join(os.environ.get("HOME"), ".%s" % __appname__)
+        if not os.path.isfile(config_file):
+            try:
+                from xdg import BaseDirectory
+            except ImportError:
+                pass
+            else:
+                config_file = os.path.join(
+                    BaseDirectory.save_config_path(__appname__), "config.ini")
+        if os.path.isfile(config_file):
+            self._confp.read([config_file])
+
+    def get(self, key, cast=str):
+        """Get the value of a key.
+
+        Returns the value of the given key in the configuration file or the
+        default value.
+
+        A key is composed of a section and an option name and looks like that:
+
+            section/optionname
+
+        Args:
+            key -- The key (e.g. foo/bar)
+            cast -- The type of the value (string by default)
+        """
+        section, option = key.split("/")
+        if self._confp.has_option(section, option):
+            return cast(self._confp.get(section, option))
+        elif key in self._default:
+            return cast(self._default[key])
+        else:
+            raise KeyError
 
 
 class NautilusTerminal(object):
@@ -66,14 +108,14 @@ class NautilusTerminal(object):
         self.shell_pid = -1
         self.term = Vte.Terminal()
         self.shell_pid = self.term.fork_command_full(Vte.PtyFlags.DEFAULT,
-                self._path, [CONF['shell']], None, GLib.SpawnFlags.SEARCH_PATH,
-                None, self.shell_pid)[1]
+                self._path, [CONF.get("terminal/shell")], None,
+                GLib.SpawnFlags.SEARCH_PATH, None, self.shell_pid)[1]
         self.term.connect_after("child-exited", self._on_term_child_exited)
         #Swin
         self.swin = Gtk.ScrolledWindow()
         self.swin.nt = self
         #Conf
-        self._set_term_height(CONF['def_term_height'])
+        self._set_term_height(CONF.get("general/def_term_height", int))
         self._visible = True
         #Lock
         self._respawn_lock = False
@@ -160,8 +202,8 @@ class NautilusTerminal(object):
         """
         if not self._respawn_lock:
             self.shell_pid = self.term.fork_command_full(Vte.PtyFlags.DEFAULT,
-                self._path, [CONF['shell']], None, GLib.SpawnFlags.SEARCH_PATH,
-                None, self.shell_pid)[1]
+                self._path, [CONF.get("terminal/shell")], None,
+                GLib.SpawnFlags.SEARCH_PATH, None, self.shell_pid)[1]
 
 
 class Crowbar(object):
@@ -224,7 +266,7 @@ class Crowbar(object):
             vpan.show()
             vbox = Gtk.VBox()
             vbox.show()
-            if CONF['term_on_top']:
+            if CONF.get("general/term_on_top", bool):
                 vpan.add2(vbox)
             else:
                 vpan.add1(vbox)
@@ -239,7 +281,7 @@ class Crowbar(object):
             nterm = NautilusTerminal(self._uri, self._window)
             if hasattr(self._window, "term_visible"):
                 nterm.set_visible(self._window.term_visible)
-            if CONF['term_on_top']:
+            if CONF.get("general/term_on_top", bool):
                 vpan.add1(nterm.get_widget())
             else:
                 vpan.add2(nterm.get_widget())
@@ -292,7 +334,7 @@ class NautilusTerminalProvider(GObject, Nautilus.LocationWidgetProvider):
         if not hasattr(window, "toggle_hide_cb"):
             window.toggle_hide_cb = []
         if not hasattr(window, "term_visible"):
-            window.term_visible = CONF['def_visible']
+            window.term_visible = CONF.get("general/def_visible", bool)
         #URI specific stuff
         if uri.startswith("x-nautilus-desktop:///"):
             return
@@ -319,6 +361,8 @@ class NautilusTerminalProvider(GObject, Nautilus.LocationWidgetProvider):
                 callback(window.term_visible)
             return True #Stop the event propagation
 
+
+CONF = Config()
 
 if __name__ == "__main__":
     #Code for testing Nautilus Terminal outside of Nautilus
