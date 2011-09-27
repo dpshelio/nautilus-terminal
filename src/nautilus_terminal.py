@@ -89,6 +89,8 @@ class Config(object):
             key -- The key (e.g. foo/bar)
             cast -- The type of the value (string by default)
         """
+        if cast == bool:
+            cast = lambda b: bool(int(b))
         section, option = key.split("/")
         if self._confp.has_option(section, option):
             return cast(self._confp.get(section, option))
