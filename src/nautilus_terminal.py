@@ -46,7 +46,7 @@ else:
     from configparser import RawConfigParser
 
 from gobject import GObject
-from gi.repository import Nautilus, Gtk, Vte, GLib
+from gi.repository import Nautilus, Gtk, Gdk, Vte, GLib
 
 
 class Config(object):
@@ -117,9 +117,31 @@ class NautilusTerminal(object):
                 self._path, [CONF.get("terminal/shell")], None,
                 GLib.SpawnFlags.SEARCH_PATH, None, self.shell_pid)[1]
         self.term.connect_after("child-exited", self._on_term_child_exited)
+        self.term.connect_after("popup-menu", self._on_term_popup_menu)
+        self.term.connect("button-release-event", self._on_term_popup_menu)
         #Swin
         self.swin = Gtk.ScrolledWindow()
         self.swin.nt = self
+        #Popup Menu
+        self.menu = Gtk.Menu()
+        #MenuItem => copy
+        menu_item = Gtk.ImageMenuItem.new_from_stock("gtk-copy", None)
+        menu_item.connect_after("activate",
+                lambda w:self.term.copy_clipboard())
+        self.menu.add(menu_item)
+        #MenuItem => paste
+        menu_item = Gtk.ImageMenuItem.new_from_stock("gtk-paste", None)
+        menu_item.connect_after("activate",
+                lambda w:self.term.paste_clipboard())
+        self.menu.add(menu_item)
+        #MenuItem => separator #TODO: Implement the preferences window
+        #menu_item = Gtk.SeparatorMenuItem()
+        #self.menu.add(menu_item)
+        #MenuItem => preferences
+        #menu_item = Gtk.ImageMenuItem.new_from_stock("gtk-preferences", None)
+        #self.menu.add(menu_item)
+        #
+        self.menu.show_all()
         #Conf
         self._set_term_height(CONF.get("general/def_term_height", int))
         self._visible = True
@@ -199,6 +221,13 @@ class NautilusTerminal(object):
         """
         self.swin.set_size_request(-1,
                 height * self.term.get_char_height() + 2)
+
+    def _on_term_popup_menu(self, widget, event=None):
+        if event: #button-release-event
+            if event.type == Gdk.EventType.BUTTON_RELEASE \
+            and event.button != 3:
+                return
+        self.menu.popup(None, None, None, None, 3, 0)
 
     def _on_term_child_exited(self, term):
         """Called when the shell is terminated.
