@@ -35,9 +35,15 @@ __app_disp_name__ = "Nautilus Terminal"
 
 
 import os
-import urllib
+import sys
 from signal import SIGTERM, SIGKILL
-from ConfigParser import RawConfigParser
+#Specific imports for Python 2 and 3
+if sys.version_info < (3, 0):
+    from urllib import url2pathname
+    from ConfigParser import RawConfigParser
+else:
+    from urllib.request import url2pathname
+    from configparser import RawConfigParser
 
 from gobject import GObject
 from gi.repository import Nautilus, Gtk, Vte, GLib
@@ -183,7 +189,7 @@ class NautilusTerminal(object):
 
         Args:
             uri -- The URI to convert."""
-        return urllib.url2pathname(uri[7:])
+        return url2pathname(uri[7:])
 
     def _set_term_height(self, height):
         """Change the terminal height.
