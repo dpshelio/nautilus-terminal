@@ -5,9 +5,11 @@
 Dependencies:
 -------------
 
-	* Python (>= 2.6, < 3.0) <http://python.org/>
+	* Python (>= 2.6) <http://python.org/>
+	* PyGObject <http://live.gnome.org/PyGObject>
+	* GObject Introspection <http://live.gnome.org/GObjectIntrospection>
+	* VTE <http://live.gnome.org/VTE>
 	* Nautilus (>= 3.0) <http://live.gnome.org/Nautilus>
 	* Nautilus Python (>= 1.0) <http://projects.gnome.org/nautilus-python/>
-	* PyGObject <http://live.gnome.org/PyGObject>
-	* VTE <http://live.gnome.org/VTE>
+	* PyXDG (optional) <http://www.freedesktop.org/wiki/Software/pyxdg>
 
