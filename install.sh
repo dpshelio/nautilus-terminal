@@ -35,6 +35,9 @@ _install() {
 	_do mkdir -p "$1"/usr/share/nautilus-python/extensions/
 	_do cp ./src/nautilus_terminal.py "$1"/usr/share/nautilus-python/extensions/
 
+	_do mkdir -p "$1"/usr/share/nautilus-terminal/
+	_do cp ./pixmap/*.png "$1"/usr/share/nautilus-terminal/
+
 	_do mkdir -p "$1"/usr/share/doc/nautilus-terminal/
 	_do cp ./AUTHORS "$1"/usr/share/doc/nautilus-terminal/
 	_do cp ./COPYING "$1"/usr/share/doc/nautilus-terminal/
@@ -50,6 +53,9 @@ _remove() {
 	_title "Removing ${APP_DISP_NAME}..."
 
 	_do rm /usr/share/nautilus-python/extensions/nautilus_terminal.py
+
+	_do rm -rf /usr/share/nautilus-terminal/
+
 	_do rm /usr/share/doc/nautilus-terminal/AUTHORS
 	_do rm /usr/share/doc/nautilus-terminal/COPYING
 	_do rm /usr/share/doc/nautilus-terminal/README

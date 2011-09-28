@@ -32,6 +32,7 @@ __author__ = "Fabien LOISON <flo at flogisoft dot com>"
 __version__ = "1.0"
 __appname__ = "nautilus-terminal"
 __app_disp_name__ = "Nautilus Terminal"
+__website__ = "http://software.flogisoft.com/nautilus-terminal/"
 
 
 import os
@@ -47,6 +48,8 @@ else:
 
 from gobject import GObject
 from gi.repository import Nautilus, Gtk, Gdk, Vte, GLib
+#This does not works yet
+#from gi.repository import GObject, Nautilus, Gtk, Gdk, Vte, GLib
 
 
 class Config(object):
@@ -142,6 +145,14 @@ class NautilusTerminal(object):
         #MenuItem => preferences
         #menu_item = Gtk.ImageMenuItem.new_from_stock("gtk-preferences", None)
         #self.menu.add(menu_item)
+        #MenuItem => separator
+        menu_item = Gtk.SeparatorMenuItem()
+        self.menu.add(menu_item)
+        #MenuItem => About
+        menu_item = Gtk.ImageMenuItem.new_from_stock("gtk-about", None)
+        menu_item.connect_after("activate",
+                lambda w:self.show_about_dialog())
+        self.menu.add(menu_item)
         #
         self.menu.show_all()
         #Conf
@@ -185,6 +196,23 @@ class NautilusTerminal(object):
             self._window.set_focus(self.term)
         else:
             self.swin.hide()
+
+    def show_about_dialog(self):
+        """Display the about dialog."""
+        about_dlg = Gtk.AboutDialog()
+        #Set the content of the dialog
+        about_dlg.set_program_name(__app_disp_name__)
+        about_dlg.set_version(__version__)
+        about_dlg.set_comments(__doc__)
+        about_dlg.set_website(__website__)
+        about_dlg.set_copyright("Copyright (c) 2011  %s" % __author__)
+        logo = Gtk.Image.new_from_file(
+                "/usr/share/nautilus-terminal/logo_120x120.png")
+        about_dlg.set_logo(logo.get_pixbuf())
+        #Signal
+        about_dlg.connect("response", lambda w, r: w.destroy())
+        #Display de dialog
+        about_dlg.show()
 
     def destroy(self):
         """Release widgets and the shell process."""
