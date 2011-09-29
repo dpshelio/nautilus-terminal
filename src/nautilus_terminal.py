@@ -46,10 +46,7 @@ else:
     from urllib.request import url2pathname
     from configparser import RawConfigParser
 
-from gobject import GObject
-from gi.repository import Nautilus, Gtk, Gdk, Vte, GLib
-#This does not works yet
-#from gi.repository import GObject, Nautilus, Gtk, Gdk, Vte, GLib
+from gi.repository import GObject, Nautilus, Gtk, Gdk, Vte, GLib
 
 
 class Config(object):
@@ -120,7 +117,7 @@ class NautilusTerminal(object):
         self.term = Vte.Terminal()
         self.shell_pid = self.term.fork_command_full(Vte.PtyFlags.DEFAULT,
                 self._path, [CONF.get("terminal/shell")], None,
-                GLib.SpawnFlags.SEARCH_PATH, None, self.shell_pid)[1]
+                GLib.SpawnFlags.SEARCH_PATH, None, None)[1]
         self.term.connect_after("child-exited", self._on_term_child_exited)
         self.term.connect_after("popup-menu", self._on_term_popup_menu)
         self.term.connect("button-release-event", self._on_term_popup_menu)
@@ -268,7 +265,7 @@ class NautilusTerminal(object):
         if not self._respawn_lock:
             self.shell_pid = self.term.fork_command_full(Vte.PtyFlags.DEFAULT,
                 self._path, [CONF.get("terminal/shell")], None,
-                GLib.SpawnFlags.SEARCH_PATH, None, self.shell_pid)[1]
+                GLib.SpawnFlags.SEARCH_PATH, None, None)[1]
 
 
 class Crowbar(object):
@@ -381,7 +378,7 @@ class Crowbar(object):
             swin.nt.destroy()
 
 
-class NautilusTerminalProvider(GObject, Nautilus.LocationWidgetProvider):
+class NautilusTerminalProvider(GObject.GObject, Nautilus.LocationWidgetProvider):
     """Provides Nautilus Terminal in Nautilus."""
 
     def __init__(self):
