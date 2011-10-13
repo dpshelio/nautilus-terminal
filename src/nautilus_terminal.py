@@ -228,10 +228,20 @@ class NautilusTerminal(object):
         """Check if the shell is waiting for a command or not."""
         wchan_path = "/proc/%i/wchan" % self.shell_pid
         wchan = open(wchan_path, "r").read()
-        if wchan != "n_tty_read":
-            return True
-        else:
+        if wchan == "n_tty_read":
             return False
+        elif wchan == "schedule":
+            shell_stack_path = "/proc/%i/stack" % self.shell_pid
+            try:
+                for line in open(shell_stack_path, "r"):
+                    if line.split(" ")[-1].startswith("n_tty_read"):
+                        return False
+                return True
+            except IOError:
+                #We can't know...
+                return False
+        else:
+            return True
 
     def _uri_to_path(self, uri):
         """Returns the path corresponding of the given URI.
