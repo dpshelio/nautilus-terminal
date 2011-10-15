@@ -139,6 +139,16 @@ class NautilusTerminal(object):
                 ord("C"),
                 Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK,
                 Gtk.AccelFlags.VISIBLE)
+        #Drag & Drop
+        self.term.drag_dest_set(
+                Gtk.DestDefaults.MOTION |
+                Gtk.DestDefaults.HIGHLIGHT |
+                Gtk.DestDefaults.DROP,
+                [Gtk.TargetEntry.new("text/uri-list", 0, 80)],
+                Gdk.DragAction.COPY,
+                )
+        self.term.drag_dest_add_uri_targets()
+        self.term.connect("drag_data_received", self._on_drag_data_received)
         #Swin
         self.swin = Gtk.ScrolledWindow()
         self.swin.nt = self
@@ -294,6 +304,11 @@ class NautilusTerminal(object):
             self.shell_pid = self.term.fork_command_full(Vte.PtyFlags.DEFAULT,
                 self._path, [CONF.get("terminal/shell")], None,
                 GLib.SpawnFlags.SEARCH_PATH, None, None)[1]
+
+    def _on_drag_data_received(self, widget, drag_context, x, y, data, info, time):
+        for uri in data.get_uris():
+            path = "'%s' " % self._uri_to_path(uri).replace("'", r"'\''")
+            self.term.feed_child(path, len(path))
 
 
 class Crowbar(object):
