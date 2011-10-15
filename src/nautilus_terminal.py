@@ -121,6 +121,21 @@ class NautilusTerminal(object):
         self.term.connect_after("child-exited", self._on_term_child_exited)
         self.term.connect_after("popup-menu", self._on_term_popup_menu)
         self.term.connect("button-release-event", self._on_term_popup_menu)
+        #Accelerators
+        accel_group = Gtk.AccelGroup()
+        self._window.add_accel_group(accel_group)
+        self.term.add_accelerator(
+                "paste-clipboard",
+                accel_group,
+                ord("V"),
+                Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK,
+                Gtk.AccelFlags.VISIBLE)
+        self.term.add_accelerator(
+                "copy-clipboard",
+                accel_group,
+                ord("C"),
+                Gdk.ModifierType.CONTROL_MASK | Gdk.ModifierType.SHIFT_MASK,
+                Gtk.AccelFlags.VISIBLE)
         #Swin
         self.swin = Gtk.ScrolledWindow()
         self.swin.nt = self
