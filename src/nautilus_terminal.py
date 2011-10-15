@@ -49,14 +49,17 @@ else:
 from gi.repository import GObject, Nautilus, Gtk, Gdk, Vte, GLib
 
 
+DEFAULT_CONF = {
+        'general/def_term_height': 5, #lines
+        'general/def_visible': True,
+        'general/term_on_top': True,
+        'terminal/shell': Vte.get_user_shell(),
+        }
+
+
 class Config(object):
     def __init__(self):
-        self._default = {
-            'general/def_term_height': 5, #lines
-            'general/def_visible': True,
-            'general/term_on_top': True,
-            'terminal/shell': Vte.get_user_shell(),
-            }
+        self._default = DEFAULT_CONF
         self._confp = RawConfigParser()
         self.read()
 
@@ -144,12 +147,12 @@ class NautilusTerminal(object):
         #MenuItem => copy
         menu_item = Gtk.ImageMenuItem.new_from_stock("gtk-copy", None)
         menu_item.connect_after("activate",
-                lambda w:self.term.copy_clipboard())
+                lambda w: self.term.copy_clipboard())
         self.menu.add(menu_item)
         #MenuItem => paste
         menu_item = Gtk.ImageMenuItem.new_from_stock("gtk-paste", None)
         menu_item.connect_after("activate",
-                lambda w:self.term.paste_clipboard())
+                lambda w: self.term.paste_clipboard())
         self.menu.add(menu_item)
         #MenuItem => separator #TODO: Implement the preferences window
         #menu_item = Gtk.SeparatorMenuItem()
@@ -163,7 +166,7 @@ class NautilusTerminal(object):
         #MenuItem => About
         menu_item = Gtk.ImageMenuItem.new_from_stock("gtk-about", None)
         menu_item.connect_after("activate",
-                lambda w:self.show_about_dialog())
+                lambda w: self.show_about_dialog())
         self.menu.add(menu_item)
         #
         self.menu.show_all()
@@ -455,7 +458,10 @@ if __name__ == "__main__":
     #Code for testing Nautilus Terminal outside of Nautilus
     print("%s %s\nBy %s" % (__app_disp_name__, __version__, __author__))
     win = Gtk.Window()
+    win.set_title("%s %s" % (__app_disp_name__, __version__))
     nterm = NautilusTerminal("file://%s" % os.environ["HOME"], win)
+    nterm._respawn_lock = True
+    nterm.term.connect("child-exited", Gtk.main_quit)
     nterm.get_widget().set_size_request(nterm.term.get_char_width() * 80 + 2,
             nterm.term.get_char_height() * 24 + 2)
     win.connect_after("destroy", Gtk.main_quit)
