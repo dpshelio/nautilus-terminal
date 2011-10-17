@@ -5,7 +5,7 @@
 ##                                                                        ##
 ## Nautilus Terminal - A terminal embedded in Nautilus                    ##
 ##                                                                        ##
-## Copyright (C) 2010-2011  Fabien LOISON <flo at flogisoft dot com>      ##
+## Copyright (C) 2011  Fabien LOISON <flo at flogisoft dot com>           ##
 ##                                                                        ##
 ## This program is free software: you can redistribute it and/or modify   ##
 ## it under the terms of the GNU General Public License as published by   ##
@@ -21,7 +21,7 @@
 ## along with this program.  If not, see <http://www.gnu.org/licenses/>.  ##
 ##                                                                        ##
 ##                                                                        ##
-## WEB SITE: http://software.flogisoft.com/nautilus-terminal/             ##
+## WEB SITE: http://projects.flogisoft.com/nautilus-terminal/             ##
 ##                                                                        ##
 ############################################################################
 
@@ -32,7 +32,7 @@ __author__ = "Fabien LOISON <flo at flogisoft dot com>"
 __version__ = "1.0"
 __appname__ = "nautilus-terminal"
 __app_disp_name__ = "Nautilus Terminal"
-__website__ = "http://software.flogisoft.com/nautilus-terminal/"
+__website__ = "http://projects.flogisoft.com/nautilus-terminal/"
 
 
 import os
@@ -58,7 +58,10 @@ DEFAULT_CONF = {
 
 
 class Config(object):
+    """Handles the configuration of Nautilus Terminal."""
+
     def __init__(self):
+        """The constructor."""
         self._default = DEFAULT_CONF
         self._confp = RawConfigParser()
         self.read()
@@ -243,8 +246,11 @@ class NautilusTerminal(object):
         """Release widgets and the shell process."""
         #Terminate the shell
         self._respawn_lock = True
-        os.kill(self.shell_pid, SIGTERM)
-        os.kill(self.shell_pid, SIGKILL)
+        try:
+            os.kill(self.shell_pid, SIGTERM)
+            os.kill(self.shell_pid, SIGKILL)
+        except OSError:
+            pass
         #Remove some widgets
         self.term.destroy()
         self.swin.destroy()
@@ -288,6 +294,7 @@ class NautilusTerminal(object):
                 height * self.term.get_char_height() + 2)
 
     def _on_term_popup_menu(self, widget, event=None):
+        """Displays the contextual menu on right-click and menu-key."""
         if event: #button-release-event
             if event.type == Gdk.EventType.BUTTON_RELEASE \
             and event.button != 3:
@@ -306,6 +313,7 @@ class NautilusTerminal(object):
                 GLib.SpawnFlags.SEARCH_PATH, None, None)[1]
 
     def _on_drag_data_received(self, widget, drag_context, x, y, data, info, time):
+        """Handles drag & drop."""
         for uri in data.get_uris():
             path = "'%s' " % self._uri_to_path(uri).replace("'", r"'\''")
             self.term.feed_child(path, len(path))
@@ -426,7 +434,7 @@ class NautilusTerminalProvider(GObject.GObject, Nautilus.LocationWidgetProvider)
 
     def __init__(self):
         """The constructor."""
-        print("[%s] I: Initializing nautilus-terminal extension"
+        print("[%s] I: Initializing the Nautilus extension"
                 % __app_disp_name__)
 
     def get_widget(self, uri, window):
